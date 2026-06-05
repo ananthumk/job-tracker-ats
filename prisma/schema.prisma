@@ -1,0 +1,154 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgvector(map: "vector")]
+}
+
+enum Role {
+  CANDIDATE
+  RECRUITER
+  ADMIN
+}
+
+enum JobType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERNSHIP
+  FREELANCE
+}
+
+enum JobStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+}
+
+enum ApplicationStatus {
+  APPLIED
+  SCREENED
+  INTERVIEW
+  OFFER
+  HIRED
+  REJECTED
+}
+
+enum InterviewType {
+  VIDEO
+  PHONE
+  ONSITE
+}
+
+enum InterviewStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id            String        @id @default(cuid())
+  email         String        @unique
+  name          String?
+  passwordHash  String?
+  role          Role          @default(CANDIDATE)
+  avatarUrl     String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  jobs          Job[]
+  applications  Application[]
+  resumes       Resume[]
+  notifications Notification[]
+
+  @@map("users")
+}
+
+model Job {
+  id           String      @id @default(cuid())
+  recruiterId  String
+  recruiter    User        @relation(fields: [recruiterId], references: [id])
+  title        String
+  slug         String      @unique
+  description  String
+  requirements String[]
+  skills       String[]
+  location     String
+  type         JobType
+  salaryMin    Int?
+  salaryMax    Int?
+  currency     String      @default("USD")
+  status       JobStatus   @default(DRAFT)
+  embedding    Unsupported("vector(1536)")?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  applications Application[]
+
+  @@map("jobs")
+}
+
+model Application {
+  id           String            @id @default(cuid())
+  candidateId  String
+  candidate    User              @relation(fields: [candidateId], references: [id])
+  jobId        String
+  job          Job               @relation(fields: [jobId], references: [id])
+  resumeUrl    String
+  coverLetter  String?
+  status       ApplicationStatus @default(APPLIED)
+  aiScore      Int?
+  aiFeedback   Json?
+  appliedAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  interviews   Interview[]
+
+  @@unique([candidateId, jobId])
+  @@map("applications")
+}
+
+model Resume {
+  id          String   @id @default(cuid())
+  candidateId String
+  candidate   User     @relation(fields: [candidateId], references: [id])
+  fileUrl     String
+  parsedData  Json?
+  embedding   Unsupported("vector(1536)")?
+  version     Int      @default(1)
+  isActive    Boolean  @default(true)
+  uploadedAt  DateTime @default(now())
+
+  @@map("resumes")
+}
+
+model Interview {
+  id            String          @id @default(cuid())
+  applicationId String
+  application   Application     @relation(fields: [applicationId], references: [id])
+  scheduledAt   DateTime
+  type          InterviewType
+  meetLink      String?
+  status        InterviewStatus @default(SCHEDULED)
+  notes         String?
+  createdAt     DateTime        @default(now())
+
+  @@map("interviews")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  type      String
+  message   String
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("notifications")
+}
